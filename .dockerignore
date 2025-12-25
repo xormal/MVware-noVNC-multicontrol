@@ -1,0 +1,76 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+*.md
+docs/
+CLAUDE.md
+DEPLOYMENT_STATUS.md
+PROTOCOL_ANALYSIS.md
+QUICKSTART.md
+START_HERE.md
+task_explanation.md
+
+# Test files
+tests/
+.pytest_cache/
+.coverage
+
+# Logs (will be mounted as volumes)
+logs/
+*.log
+protocol_probe_*.log
+probe_run.log
+
+# Screenshots (will be mounted as volumes)
+screenshots/
+*.png
+
+# Credentials (never include in image)
+.env
+config/servers.json
+vmware_credentials.md
+*.pem
+*.key
+*.crt
+
+# Example files (not needed in container)
+*.example
+
+# Protocol detection artifacts
+*.pcap
+protocol_dump_*.bin
+protocol_dump_*.txt
+
+# Scripts (not needed in production)
+scripts/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/

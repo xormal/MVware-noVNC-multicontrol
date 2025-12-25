@@ -1,0 +1,24 @@
+{
+  "servers": {
+    "example-server-id-1": {
+      "id": "example-server-id-1",
+      "name": "ESXi Server 1",
+      "host": "192.168.1.10",
+      "port": 443,
+      "user": "root",
+      "password": "your_password_here",
+      "verify_ssl": false,
+      "enabled": true
+    },
+    "example-server-id-2": {
+      "id": "example-server-id-2",
+      "name": "ESXi Server 2",
+      "host": "192.168.1.11",
+      "port": 443,
+      "user": "root",
+      "password": "your_password_here",
+      "verify_ssl": false,
+      "enabled": true
+    }
+  }
+}

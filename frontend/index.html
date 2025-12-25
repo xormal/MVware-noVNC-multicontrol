@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESXi Console Portal - Multi-Server</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        /* Header with Tabs */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            z-index: 1000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .header-top {
+            height: 50px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-right: auto;
+        }
+
+        .btn-settings {
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .btn-settings:hover {
+            background: #1976D2;
+        }
+
+        /* Server Tabs */
+        .tabs-container {
+            display: flex;
+            padding: 0 20px;
+            overflow-x: auto;
+            background: #fafafa;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+            white-space: nowrap;
+            transition: all 0.2s;
+            color: #666;
+        }
+
+        .tab:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .tab.active {
+            color: #2196F3;
+            border-bottom-color: #2196F3;
+            background: white;
+            font-weight: 500;
+        }
+
+        .tab .server-name {
+            margin-right: 8px;
+        }
+
+        .tab .vm-count-badge {
+            background: #e0e0e0;
+            color: #666;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .tab.active .vm-count-badge {
+            background: #E3F2FD;
+            color: #2196F3;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            height: 50px;
+            padding: 0 20px;
+            background: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            max-width: 400px;
+            height: 36px;
+            padding: 0 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .btn-clear {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-clear:hover {
+            background: #f5f5f5;
+        }
+
+        .search-count {
+            margin-left: auto;
+            color: #999;
+            font-size: 13px;
+        }
+
+        /* Gauge Indicators */
+        .gauge-container {
+            display: flex;
+            gap: 15px;
+            margin-left: 20px;
+            align-items: center;
+        }
+
+        .gauge-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        #gauge-disk-container {
+            display: flex;
+            gap: 10px;
+            max-width: 400px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 2px 0;
+        }
+
+        #gauge-disk-container::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        #gauge-disk-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #gauge-disk-container::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 2px;
+        }
+
+        #gauge-disk-container::-webkit-scrollbar-thumb:hover {
+            background: #bbb;
+        }
+
+        .gauge-circle {
+            width: 32px;
+            height: 32px;
+            position: relative;
+        }
+
+        .gauge-circle svg {
+            transform: rotate(-90deg);
+        }
+
+        .gauge-circle-bg {
+            fill: none;
+            stroke: #e0e0e0;
+            stroke-width: 3;
+        }
+
+        .gauge-circle-fill {
+            fill: none;
+            stroke-width: 3;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .gauge-circle-fill.cpu {
+            stroke: #4CAF50;
+        }
+
+        .gauge-circle-fill.mem {
+            stroke: #2196F3;
+        }
+
+        .gauge-circle-fill.dsk {
+            stroke: #FF9800;
+        }
+
+        .gauge-text {
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .gauge-label {
+            font-weight: 600;
+            color: #333;
+            margin-right: 2px;
+        }
+
+        /* Tooltip for disk datastore */
+        .gauge-tooltip {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            margin-bottom: 5px;
+            z-index: 1000;
+        }
+
+        .gauge-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.85);
+        }
+
+        .gauge-item:hover .gauge-tooltip {
+            display: block;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 150px;
+            padding: 20px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* VM List Styles (from original) */
+        .vm-list {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .vm-row {
+            background: white;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+
+        .vm-row:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+
+        .vm-thumbnail {
+            width: 120px;
+            height: 90px;
+            flex-shrink: 0;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            background: #000;
+            position: relative;
+        }
+
+        .vm-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.5s ease;
+        }
+
+        .vm-thumbnail img.fade-out {
+            opacity: 0;
+        }
+
+        .vm-thumbnail .img-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .vm-thumbnail .img-overlay.active {
+            opacity: 1;
+        }
+
+        .vm-thumbnail .power-off-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .vm-info {
+            flex: 1;
+            padding: 0 20px;
+            min-width: 0;
+        }
+
+        .vm-name {
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .vm-details {
+            font-size: 12px;
+            color: #999;
+            display: flex;
+            gap: 12px;
+        }
+
+        .vm-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .action-btn:hover {
+            background: #f5f5f5;
+            border-color: #999;
+        }
+
+        .action-btn:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            margin-bottom: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .status-on {
+            background: #4CAF50;
+        }
+
+        .status-off {
+            background: #999;
+        }
+
+        /* Settings Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .server-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .server-item {
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .server-item-info {
+            flex: 1;
+        }
+
+        .server-item-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .server-item-details {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .server-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-small:hover {
+            background: #f5f5f5;
+        }
+
+        .btn-small.btn-test {
+            border-color: #2196F3;
+            color: #2196F3;
+        }
+
+        .btn-small.btn-test:hover {
+            background: #E3F2FD;
+        }
+
+        .btn-small.btn-delete {
+            border-color: #f44336;
+            color: #f44336;
+        }
+
+        .btn-small.btn-delete:hover {
+            background: #FFEBEE;
+        }
+
+        .btn-small.btn-edit {
+            background: white;
+            color: #1976D2;
+            border-color: #1976D2;
+        }
+
+        .btn-small.btn-edit:hover {
+            background: #E3F2FD;
+        }
+
+        .add-server-form, .edit-server-form {
+            border-top: 1px solid #e0e0e0;
+            padding-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 10px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            background: #1976D2;
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            padding: 10px 20px;
+            background: white;
+            color: #666;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-secondary:hover {
+            background: #f5f5f5;
+            border-color: #999;
+        }
+
+        /* Loading & Error States */
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #f44336;
+        }
+
+        .test-result {
+            margin-top: 8px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .test-result.success {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .test-result.error {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+
+        /* Console Modal (existing styles) */
+        .console-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 3000;
+        }
+
+        .console-modal.active {
+            display: flex;
+        }
+
+        .console-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .console-header {
+            height: 50px;
+            background: #333;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .console-title {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .console-status {
+            margin-left: 15px;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .close-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #console-viewer {
+            flex: 1;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-top">
+            <div class="header-title">ESXi Console Portal</div>
+            <button class="btn-settings" onclick="openSettings()">⚙ Settings</button>
+        </div>
+        
+        <!-- Server Tabs -->
+        <div class="tabs-container" id="server-tabs">
+            <!-- Tabs will be inserted here -->
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <input type="text" class="search-input" id="search-input" placeholder="Search VMs...">
+            <button class="btn-clear" onclick="clearSearch()">Clear</button>
+            <span class="search-count" id="search-count">0 VMs</span>
+
+            <!-- Gauge Indicators -->
+            <div class="gauge-container" id="gauge-container">
+                <!-- CPU Gauge -->
+                <div class="gauge-item">
+                    <div class="gauge-circle">
+                        <svg width="32" height="32">
+                            <circle class="gauge-circle-bg" cx="16" cy="16" r="13"></circle>
+                            <circle class="gauge-circle-fill cpu" cx="16" cy="16" r="13"
+                                    id="gauge-cpu-fill" stroke-dasharray="81.68" stroke-dashoffset="81.68"></circle>
+                        </svg>
+                    </div>
+                    <div class="gauge-text">
+                        <span class="gauge-label">CPU</span>
+                        <span id="gauge-cpu-text">-% / -</span>
+                    </div>
+                </div>
+
+                <!-- Memory Gauge -->
+                <div class="gauge-item">
+                    <div class="gauge-circle">
+                        <svg width="32" height="32">
+                            <circle class="gauge-circle-bg" cx="16" cy="16" r="13"></circle>
+                            <circle class="gauge-circle-fill mem" cx="16" cy="16" r="13"
+                                    id="gauge-mem-fill" stroke-dasharray="81.68" stroke-dashoffset="81.68"></circle>
+                        </svg>
+                    </div>
+                    <div class="gauge-text">
+                        <span class="gauge-label">MEM</span>
+                        <span id="gauge-mem-text">- / -GB</span>
+                    </div>
+                </div>
+
+                <!-- Disk Gauge (will be dynamically populated) -->
+                <div id="gauge-disk-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        <!-- Tab contents will be inserted here -->
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">ESXi Server Settings</div>
+                <button class="modal-close" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="server-list" id="server-list">
+                    <!-- Server items will be inserted here -->
+                </div>
+                
+                <div class="add-server-form">
+                    <h3 style="margin-bottom: 15px; font-size: 16px;">Add New Server</h3>
+                    <form id="add-server-form" onsubmit="addServer(event)">
+                        <div class="form-group">
+                            <label class="form-label">Server Name</label>
+                            <input type="text" name="name" class="form-input" required placeholder="Production ESXi">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Host / IP</label>
+                                <input type="text" name="host" class="form-input" required placeholder="192.168.1.100">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Port</label>
+                                <input type="number" name="port" class="form-input" value="443">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Username</label>
+                                <input type="text" name="user" class="form-input" required placeholder="root">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Password</label>
+                                <input type="password" name="password" class="form-input" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" id="add-server-btn">Add Server</button>
+                    </form>
+                </div>
+
+                <div class="edit-server-form" id="edit-server-form" style="display: none;">
+                    <h3 style="margin-bottom: 15px; font-size: 16px;">Edit Server</h3>
+                    <form id="edit-form" onsubmit="updateServer(event)">
+                        <input type="hidden" name="server_id" id="edit-server-id">
+                        <div class="form-group">
+                            <label class="form-label">Server Name</label>
+                            <input type="text" name="name" id="edit-name" class="form-input" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Host / IP</label>
+                                <input type="text" name="host" id="edit-host" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Port</label>
+                                <input type="number" name="port" id="edit-port" class="form-input">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Username</label>
+                                <input type="text" name="user" id="edit-user" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Password</label>
+                                <input type="password" name="password" id="edit-password" class="form-input" placeholder="Leave empty to keep current">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn-primary" id="update-server-btn">Update Server</button>
+                            <button type="button" class="btn-secondary" onclick="cancelEdit()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Modal -->
+    <div id="console-modal" class="console-modal">
+        <div class="console-container">
+            <div class="console-header">
+                <div>
+                    <span class="console-title" id="console-vm-name">VM Console</span>
+                    <span class="console-status" id="console-status">Connecting...</span>
+                </div>
+                <button class="close-btn" onclick="closeConsole()">Close</button>
+            </div>
+            <div id="console-viewer"></div>
+        </div>
+    </div>
+    <script type="module">
+        import RFB from './noVNC/core/rfb.js';
+
+        // Configuration
+        // Use current window location for API (supports any host/port)
+        const API_BASE = `${window.location.protocol}//${window.location.host}/api/v1`;
+        const THUMBNAIL_REFRESH_INTERVAL = 30000;  // 30 seconds - hash checking is lightweight
+        const REQUEST_TIMEOUT = 180000;  // 3 minutes timeout for large server responses
+        const GAUGE_REFRESH_INTERVAL = 5000;  // 5 seconds for gauge updates
+
+        // State
+        let servers = [];
+        let currentServerId = null;
+        let serverVMs = {}; // {server_id: {vms: [], filtered: []}}
+        let serverStats = {}; // {server_id: {cpu: {}, memory: {}, datastores: []}}
+        let thumbnailTimers = new Map();
+        let thumbnailCache = {}; // {serverId-moid: url} - кеш URL миниатюр
+        let thumbnailHashes = {}; // {serverId-moid: hash} - хеши миниатюр для проверки изменений
+        let rfb = null;
+        let gaugeTimer = null;
+
+        // Error Banner Functions
+        function showErrorBanner(message) {
+            let banner = document.getElementById('error-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'error-banner';
+                banner.style.cssText = `
+                    position: fixed;
+                    top: 60px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    z-index: 10000;
+                    font-size: 14px;
+                    max-width: 600px;
+                    animation: slideDown 0.3s ease-out;
+                `;
+                document.body.appendChild(banner);
+            }
+            banner.textContent = message;
+            banner.style.display = 'block';
+        }
+
+        function hideErrorBanner() {
+            const banner = document.getElementById('error-banner');
+            if (banner) {
+                banner.style.display = 'none';
+            }
+        }
+
+        // Gauge Functions
+        function updateGauge(type, percentage, text) {
+            const circle = document.getElementById(`gauge-${type}-fill`);
+            const textEl = document.getElementById(`gauge-${type}-text`);
+
+            if (!circle || !textEl) return;
+
+            // Calculate stroke-dashoffset (circumference is ~81.68 for r=13)
+            const circumference = 81.68;
+            const offset = circumference - (percentage / 100) * circumference;
+
+            circle.style.strokeDashoffset = offset;
+            textEl.textContent = text;
+        }
+
+        function renderDiskGauges(datastores) {
+            const container = document.getElementById('gauge-disk-container');
+            if (!container || !datastores) return;
+
+            container.innerHTML = datastores.map((ds, idx) => `
+                <div class="gauge-item">
+                    <div class="gauge-tooltip">${ds.name}</div>
+                    <div class="gauge-circle">
+                        <svg width="32" height="32">
+                            <circle class="gauge-circle-bg" cx="16" cy="16" r="13"></circle>
+                            <circle class="gauge-circle-fill dsk" cx="16" cy="16" r="13"
+                                    id="gauge-dsk-${idx}-fill" stroke-dasharray="81.68" stroke-dashoffset="81.68"></circle>
+                        </svg>
+                    </div>
+                    <div class="gauge-text">
+                        <span class="gauge-label">DSK${idx + 1}</span>
+                        <span id="gauge-dsk-${idx}-text">-% / -GB</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Update each disk gauge
+            datastores.forEach((ds, idx) => {
+                const circle = document.getElementById(`gauge-dsk-${idx}-fill`);
+                const textEl = document.getElementById(`gauge-dsk-${idx}-text`);
+
+                if (circle && textEl) {
+                    const percentage = (ds.used / ds.capacity) * 100;
+                    const circumference = 81.68;
+                    const offset = circumference - (percentage / 100) * circumference;
+
+                    circle.style.strokeDashoffset = offset;
+                    textEl.textContent = `${percentage.toFixed(0)}% / ${(ds.capacity / (1024**3)).toFixed(0)}GB`;
+                }
+            });
+        }
+
+        function displayServerStats(serverId) {
+            // Display cached stats immediately
+            const stats = serverStats[serverId];
+            if (!stats) {
+                // No stats for this server - show skeleton
+                showStatsSkeleton();
+                return;
+            }
+
+            // Update CPU gauge
+            if (stats.cpu) {
+                const cpuPercent = stats.cpu.usage_percent || 0;
+                const cpuCores = stats.cpu.num_cores || 0;
+                updateGauge('cpu', cpuPercent, `${cpuPercent.toFixed(0)}% / ${cpuCores}`);
+            }
+
+            // Update Memory gauge
+            if (stats.memory) {
+                const memUsedGB = (stats.memory.used / (1024**3)) || 0;
+                const memTotalGB = (stats.memory.total / (1024**3)) || 0;
+                const memPercent = (memUsedGB / memTotalGB) * 100 || 0;
+                updateGauge('mem', memPercent, `${memUsedGB.toFixed(1)} / ${memTotalGB.toFixed(0)}GB`);
+            }
+
+            // Update Disk gauges
+            if (stats.datastores && stats.datastores.length > 0) {
+                renderDiskGauges(stats.datastores);
+            }
+        }
+
+        function showStatsSkeleton() {
+            // Show skeleton loader for CPU
+            updateGauge('cpu', 0, '...');
+
+            // Show skeleton loader for Memory
+            updateGauge('mem', 0, '...');
+
+            // Show skeleton loader for Disks (match renderDiskGauges format)
+            const diskContainer = document.getElementById('gauge-disk-container');
+            if (diskContainer) {
+                diskContainer.innerHTML = `
+                    <div class="gauge-item">
+                        <div class="gauge-tooltip">...</div>
+                        <div class="gauge-circle">
+                            <svg width="32" height="32">
+                                <circle class="gauge-circle-bg" cx="16" cy="16" r="13"></circle>
+                                <circle class="gauge-circle-fill dsk" cx="16" cy="16" r="13"
+                                        stroke-dasharray="81.68" stroke-dashoffset="81.68"></circle>
+                            </svg>
+                        </div>
+                        <div class="gauge-text">
+                            <span class="gauge-label">DSK</span>
+                            <span>...</span>
+                        </div>
+                    </div>
+                `.trim();
+            }
+        }
+
+        async function loadServerStats(serverId) {
+            if (!serverId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/servers/${serverId}/stats`, {
+                    signal: AbortSignal.timeout(10000)
+                });
+
+                if (!response.ok) {
+                    // Clear stats on error (404 means background service hasn't populated yet)
+                    delete serverStats[serverId];
+
+                    // Show skeleton if this is current server
+                    if (serverId === currentServerId) {
+                        showStatsSkeleton();
+                    }
+                    return;
+                }
+
+                const stats = await response.json();
+
+                // Cache stats
+                serverStats[serverId] = stats;
+
+                // Display if this is still the current server
+                if (serverId === currentServerId) {
+                    displayServerStats(serverId);
+
+                    // Show error banner if there's an error
+                    if (stats.error) {
+                        showErrorBanner(`⚠️ ESXi Connection Error: ${stats.error}`);
+                    } else {
+                        hideErrorBanner();
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading server stats:', error);
+                // Clear stats on error
+                delete serverStats[serverId];
+
+                // Show skeleton if this is current server
+                if (serverId === currentServerId) {
+                    showStatsSkeleton();
+                }
+            }
+        }
+
+        function startGaugeRefresh(serverId) {
+            stopGaugeRefresh();
+
+            // Display cached stats immediately (instant switch)
+            if (serverStats[serverId]) {
+                displayServerStats(serverId);
+            }
+
+            // Load fresh stats in background
+            loadServerStats(serverId);
+
+            // Periodic refresh
+            gaugeTimer = setInterval(() => {
+                loadServerStats(serverId);
+            }, GAUGE_REFRESH_INTERVAL);
+        }
+
+        function stopGaugeRefresh() {
+            if (gaugeTimer) {
+                clearInterval(gaugeTimer);
+                gaugeTimer = null;
+            }
+        }
+
+        // Initialize
+        async function init() {
+            await loadServers();
+            if (servers.length > 0) {
+                switchToServer(servers[0].id);
+            }
+        }
+
+        // Server Management
+        async function loadServers() {
+            try {
+                const response = await fetch(`${API_BASE}/servers`);
+                const data = await response.json();
+                servers = data.servers.filter(s => s.enabled);
+                
+                renderServerTabs();
+                renderServerList();
+            } catch (error) {
+                console.error('Error loading servers:', error);
+            }
+        }
+
+        function renderServerTabs() {
+            const container = document.getElementById('server-tabs');
+            container.innerHTML = servers.map(server => `
+                <div class="tab ${server.id === currentServerId ? 'active' : ''}"
+                     onclick="switchToServer('${server.id}')">
+                    <span class="server-name">${server.name}</span>
+                    <span class="vm-count-badge" id="badge-${server.id}">-</span>
+                </div>
+            `).join('');
+
+            // Update VM counts for all servers that have loaded VMs
+            servers.forEach(server => {
+                if (serverVMs[server.id]) {
+                    updateVMCount(server.id);
+                }
+            });
+        }
+
+        function renderServerList() {
+            const container = document.getElementById('server-list');
+            container.innerHTML = servers.map(server => `
+                <div class="server-item">
+                    <div class="server-item-info">
+                        <div class="server-item-name">${server.name}</div>
+                        <div class="server-item-details">${server.host}:${server.port} (${server.user})</div>
+                        <div id="test-result-${server.id}"></div>
+                    </div>
+                    <div class="server-item-actions">
+                        <button class="btn-small btn-test" onclick="testServer('${server.id}')">Test</button>
+                        <button class="btn-small btn-edit" onclick="editServer('${server.id}')">Edit</button>
+                        <button class="btn-small btn-delete" onclick="deleteServer('${server.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.switchToServer = async function(serverId) {
+            currentServerId = serverId;
+
+            // Hide all tab contents FIRST
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+
+            renderServerTabs();
+
+            // Start gauge refresh for this server
+            startGaugeRefresh(serverId);
+
+            // Create tab content if doesn't exist
+            if (!serverVMs[serverId]) {
+                serverVMs[serverId] = { vms: [], filtered: [] };
+                await loadVMs(serverId);
+            } else {
+                renderVMs(serverId);
+                // Show active tab content for already loaded servers
+                let tabContent = document.getElementById(`content-${serverId}`);
+                if (tabContent) {
+                    tabContent.classList.add('active');
+                }
+                // Update VM count for already loaded servers
+                updateVMCount(serverId);
+            }
+        };
+
+        async function loadVMs(serverId, autoRetry = true) {
+            const mainContent = document.getElementById('main-content');
+
+            // Create content container for this server
+            let contentDiv = document.getElementById(`content-${serverId}`);
+            if (!contentDiv) {
+                contentDiv = document.createElement('div');
+                contentDiv.id = `content-${serverId}`;
+                contentDiv.className = 'tab-content active';  // Set active immediately
+                contentDiv.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading VMs...</div></div>';
+                mainContent.appendChild(contentDiv);
+            } else {
+                // Make sure it's visible when loading
+                contentDiv.classList.add('active');
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/servers/${serverId}/vms`, {
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT)
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                serverVMs[serverId] = {
+                    vms: data.vms,
+                    filtered: data.vms
+                };
+
+                renderVMs(serverId);
+                updateVMCount(serverId);
+
+                // Show error banner if there's an error
+                if (data.error && serverId === currentServerId) {
+                    showErrorBanner(`⚠️ ESXi Connection Error: ${data.error}`);
+                } else if (serverId === currentServerId) {
+                    hideErrorBanner();
+                }
+
+                // If VM list is empty and auto-retry enabled, schedule periodic retries (infinite)
+                if (data.vms.length === 0 && autoRetry) {
+                    console.log(`VM list empty for ${serverId}, starting periodic retry (every 5s)...`);
+
+                    const retryInterval = setInterval(() => {
+                        // Stop only if VMs appeared
+                        if (serverVMs[serverId] && serverVMs[serverId].vms.length > 0) {
+                            clearInterval(retryInterval);
+                            console.log(`VMs appeared for ${serverId}, stopping retry`);
+                            return;
+                        }
+
+                        console.log(`Retrying VM list for ${serverId}...`);
+                        loadVMs(serverId, false); // Don't start another retry loop
+                    }, 5000); // Retry every 5 seconds indefinitely
+                }
+
+                // Temporarily disabled auto-refresh to prevent server overload
+                // startThumbnailRefresh(serverId);
+
+            } catch (error) {
+                contentDiv.innerHTML = `
+                    <div class="error-state">
+                        <div>⚠️ Failed to load VMs</div>
+                        <div style="margin-top: 10px; font-size: 13px;">${error.message}</div>
+                        <button class="btn-primary" style="max-width: 200px; margin: 20px auto;"
+                                onclick="loadVMs('${serverId}', false)">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderVMs(serverId) {
+            const contentDiv = document.getElementById(`content-${serverId}`);
+            if (!contentDiv || !serverVMs[serverId]) return;
+
+            const vms = serverVMs[serverId].filtered;
+
+            if (vms.length === 0) {
+                // Show loading state - background service is fetching VMs
+                contentDiv.innerHTML = `
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <div>No VMs yet - background service is fetching...</div>
+                        <div style="margin-top: 10px; font-size: 12px; opacity: 0.7;">
+                            This may take up to 30 seconds
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const vmList = document.createElement('div');
+            vmList.className = 'vm-list';
+            vmList.innerHTML = vms.map(vm => {
+                const cacheKey = `${serverId}-${vm.moid}`;
+                const cachedUrl = thumbnailCache[cacheKey];
+                // Используем кешированный URL если есть, иначе базовый URL без timestamp
+                const thumbnailUrl = cachedUrl || `${API_BASE}/servers/${serverId}/vms/${vm.moid}/thumbnail`;
+
+                return `
+                <div class="vm-row">
+                    <div class="vm-thumbnail" onclick="openConsole('${serverId}', '${vm.moid}', '${vm.name}')"
+                         id="thumbnail-${serverId}-${vm.moid}">
+                        ${vm.power_state === 'poweredOn' ?
+                            `<img src="${thumbnailUrl}"
+                                  onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'power-off-overlay\\'>No image yet</div>'">` :
+                            '<div class="power-off-overlay">Powered Off</div>'
+                        }
+                    </div>
+                    <div class="vm-info">
+                        <div class="vm-name">
+                            <span class="status-dot status-${vm.power_state === 'poweredOn' ? 'on' : 'off'}"></span>
+                            ${vm.name}
+                        </div>
+                        <div class="vm-details">
+                            <span>${vm.power_state}</span>
+                            <span>${vm.num_cpu} vCPU</span>
+                            <span>${vm.memory_mb} MB</span>
+                            <span>${vm.guest_os || 'Unknown OS'}</span>
+                        </div>
+                    </div>
+                    <div class="vm-actions">
+                        <button class="action-btn" title="Open Console"
+                                onclick="openConsole('${serverId}', '${vm.moid}', '${vm.name}')">
+                            🖥️
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(vmList);
+        }
+
+        function updateVMCount(serverId) {
+            const badge = document.getElementById(`badge-${serverId}`);
+            if (badge && serverVMs[serverId]) {
+                const total = serverVMs[serverId].vms.length;
+                const filtered = serverVMs[serverId].filtered.length;
+                badge.textContent = filtered === total ? total : `${filtered}/${total}`;
+            }
+
+            // Update search count if current server
+            if (serverId === currentServerId) {
+                const count = document.getElementById('search-count');
+                if (count && serverVMs[serverId]) {
+                    const filtered = serverVMs[serverId].filtered.length;
+                    const total = serverVMs[serverId].vms.length;
+                    count.textContent = filtered === total ? 
+                        `${total} VMs` : `${filtered} of ${total} VMs`;
+                }
+            }
+        }
+
+        async function startThumbnailRefresh(serverId) {
+            const vms = serverVMs[serverId]?.vms || [];
+            const poweredOn = vms.filter(vm => vm.power_state === 'poweredOn');
+
+            // Parallel batch loading (2 thumbnails at a time to avoid ESXi overload)
+            const BATCH_SIZE = 2;
+
+            for (let i = 0; i < poweredOn.length; i += BATCH_SIZE) {
+                const batch = poweredOn.slice(i, i + BATCH_SIZE);
+
+                // Load batch in parallel
+                await Promise.all(batch.map(vm => refreshThumbnail(serverId, vm.moid)));
+
+                // Delay between batches to avoid overwhelming ESXi
+                if (i + BATCH_SIZE < poweredOn.length) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            }
+
+            // Set up periodic hash-based refresh (проверка изменений каждые 30 секунд)
+            const key = `refresh-${serverId}`;
+            const timer = setInterval(() => {
+                checkAndRefreshThumbnails(serverId);
+            }, 30000); // Проверяем хеши каждые 30 секунд
+            thumbnailTimers.set(key, timer);
+        }
+
+        async function checkAndRefreshThumbnails(serverId) {
+            try {
+                // Получаем хеши с сервера
+                const response = await fetch(`${API_BASE}/servers/${serverId}/thumbnails/hashes`);
+                if (!response.ok) return;
+
+                const serverHashes = await response.json();
+
+                // Находим миниатюры, которые изменились
+                const changedVMs = [];
+                for (const [moid, newHash] of Object.entries(serverHashes)) {
+                    const cacheKey = `${serverId}-${moid}`;
+                    const oldHash = thumbnailHashes[cacheKey];
+
+                    if (!oldHash || oldHash !== newHash) {
+                        changedVMs.push(moid);
+                    }
+                }
+
+                // Обновляем только изменившиеся миниатюры (батчами)
+                const BATCH_SIZE = 2;
+                for (let i = 0; i < changedVMs.length; i += BATCH_SIZE) {
+                    const batch = changedVMs.slice(i, i + BATCH_SIZE);
+                    await Promise.all(batch.map(moid => refreshThumbnail(serverId, moid)));
+
+                    if (i + BATCH_SIZE < changedVMs.length) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error checking thumbnail hashes:', error);
+            }
+        }
+
+        async function refreshThumbnail(serverId, moid) {
+            return new Promise((resolve) => {
+                const container = document.getElementById(`thumbnail-${serverId}-${moid}`);
+                if (!container || container.dataset.updating === 'true') {
+                    resolve();
+                    return;
+                }
+
+                container.dataset.updating = 'true';
+
+                const currentImg = container.querySelector('img');
+                if (!currentImg) {
+                    container.dataset.updating = 'false';
+                    resolve();
+                    return;
+                }
+
+                const newImg = new Image();
+                newImg.className = 'img-overlay';
+
+                // URL с timestamp для обновления
+                const timestampedUrl = `${API_BASE}/servers/${serverId}/vms/${moid}/thumbnail?t=${Date.now()}`;
+                const cacheKey = `${serverId}-${moid}`;
+
+                newImg.onload = async function() {
+                    // Сохраняем URL в кеш после успешной загрузки
+                    thumbnailCache[cacheKey] = timestampedUrl;
+
+                    // Получаем и сохраняем хеш миниатюры
+                    try {
+                        const hashResponse = await fetch(`${API_BASE}/servers/${serverId}/thumbnails/hashes`);
+                        if (hashResponse.ok) {
+                            const hashes = await hashResponse.json();
+                            if (hashes[moid]) {
+                                thumbnailHashes[cacheKey] = hashes[moid];
+                            }
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки получения хеша
+                    }
+
+                    container.appendChild(newImg);
+                    newImg.offsetHeight;
+
+                    requestAnimationFrame(() => {
+                        currentImg.classList.add('fade-out');
+                        newImg.classList.add('active');
+                    });
+
+                    setTimeout(() => {
+                        currentImg.src = newImg.src;
+                        currentImg.classList.remove('fade-out');
+                        newImg.remove();
+                        container.dataset.updating = 'false';
+                        resolve();
+                    }, 500);
+                };
+
+                newImg.onerror = () => {
+                    // При 404 показываем placeholder "No image yet"
+                    container.innerHTML = '<div class="power-off-overlay">No image yet</div>';
+                    container.dataset.updating = 'false';
+                    resolve();
+                };
+
+                newImg.src = timestampedUrl;
+            });
+        }
+
+        // Search
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (!currentServerId || !serverVMs[currentServerId]) return;
+
+            const server = serverVMs[currentServerId];
+            
+            if (!query) {
+                server.filtered = server.vms;
+            } else {
+                server.filtered = server.vms.filter(vm => 
+                    vm.name.toLowerCase().includes(query)
+                );
+            }
+
+            renderVMs(currentServerId);
+            updateVMCount(currentServerId);
+        });
+
+        window.clearSearch = function() {
+            document.getElementById('search-input').value = '';
+            if (currentServerId && serverVMs[currentServerId]) {
+                serverVMs[currentServerId].filtered = serverVMs[currentServerId].vms;
+                renderVMs(currentServerId);
+                updateVMCount(currentServerId);
+            }
+        };
+
+        // Settings Modal
+        window.openSettings = function() {
+            document.getElementById('settings-modal').classList.add('active');
+        };
+
+        window.closeSettings = function() {
+            document.getElementById('settings-modal').classList.remove('active');
+        };
+
+        window.addServer = async function(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            data.port = parseInt(data.port);
+
+            const btn = document.getElementById('add-server-btn');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            try {
+                const response = await fetch(`${API_BASE}/servers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Failed to add server');
+
+                const newServer = await response.json();
+                form.reset();
+                await loadServers();
+
+                // Switch to the newly added server
+                if (newServer && newServer.id) {
+                    await switchToServer(newServer.id);
+                }
+
+                alert('Server added successfully!');
+
+            } catch (error) {
+                alert('Error adding server: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Server';
+            }
+        };
+
+        window.deleteServer = async function(serverId) {
+            if (!confirm('Are you sure you want to delete this server?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/servers/${serverId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete server');
+
+                await loadServers();
+
+                if (currentServerId === serverId) {
+                    currentServerId = null;
+                    if (servers.length > 0) {
+                        switchToServer(servers[0].id);
+                    }
+                }
+
+            } catch (error) {
+                alert('Error deleting server: ' + error.message);
+            }
+        };
+
+        window.editServer = function(serverId) {
+            const server = servers.find(s => s.id === serverId);
+            if (!server) return;
+
+            // Hide add form, show edit form
+            document.getElementById('add-server-form').style.display = 'none';
+            document.getElementById('edit-server-form').style.display = 'block';
+
+            // Populate form
+            document.getElementById('edit-server-id').value = server.id;
+            document.getElementById('edit-name').value = server.name;
+            document.getElementById('edit-host').value = server.host;
+            document.getElementById('edit-port').value = server.port;
+            document.getElementById('edit-user').value = server.user;
+            document.getElementById('edit-password').value = ''; // Don't show current password
+        };
+
+        window.cancelEdit = function() {
+            document.getElementById('edit-server-form').style.display = 'none';
+            document.getElementById('add-server-form').style.display = 'block';
+            document.getElementById('edit-form').reset();
+        };
+
+        window.updateServer = async function(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const serverId = formData.get('server_id');
+
+            const data = {
+                name: formData.get('name'),
+                host: formData.get('host'),
+                port: parseInt(formData.get('port')),
+                user: formData.get('user')
+            };
+
+            // Only include password if it was provided
+            const password = formData.get('password');
+            if (password && password.trim() !== '') {
+                data.password = password;
+            }
+
+            const btn = document.getElementById('update-server-btn');
+            btn.disabled = true;
+            btn.textContent = 'Updating...';
+
+            try {
+                const response = await fetch(`${API_BASE}/servers/${serverId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Failed to update server');
+
+                await loadServers();
+                cancelEdit();
+                alert('Server updated successfully!');
+
+            } catch (error) {
+                alert('Error updating server: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Update Server';
+            }
+        };
+
+        window.testServer = async function(serverId) {
+            const resultDiv = document.getElementById(`test-result-${serverId}`);
+            resultDiv.innerHTML = '<div class="test-result">Testing...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/servers/${serverId}/test`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                resultDiv.innerHTML = `
+                    <div class="test-result ${result.success ? 'success' : 'error'}">
+                        ${result.message}
+                    </div>
+                `;
+
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result error">Error: ${error.message}</div>
+                `;
+            }
+        };
+
+        // Console
+        window.openConsole = async function(serverId, moid, vmName) {
+            document.getElementById('console-modal').classList.add('active');
+            document.getElementById('console-vm-name').textContent = vmName;
+            document.getElementById('console-status').textContent = 'Connecting...';
+
+            try {
+                // Note: Console endpoint needs to be updated to support server_id
+                const response = await fetch(`${API_BASE}/servers/${serverId}/vms/${moid}/console`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) throw new Error('Failed to create console session');
+
+                const data = await response.json();
+
+                const viewer = document.getElementById('console-viewer');
+                viewer.innerHTML = '';
+
+                rfb = new RFB(viewer, data.ws_url, {
+                    credentials: { password: '' }
+                });
+
+                rfb.scaleViewport = true;
+                rfb.resizeSession = true;
+
+                rfb.addEventListener('connect', () => {
+                    document.getElementById('console-status').textContent = 'Connected';
+                });
+
+                rfb.addEventListener('disconnect', () => {
+                    document.getElementById('console-status').textContent = 'Disconnected';
+                });
+
+            } catch (error) {
+                document.getElementById('console-status').textContent = `Error: ${error.message}`;
+            }
+        };
+
+        window.closeConsole = function() {
+            if (rfb) {
+                rfb.disconnect();
+                rfb = null;
+            }
+            document.getElementById('console-modal').classList.remove('active');
+        };
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

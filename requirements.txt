@@ -1,0 +1,35 @@
+# VMware ESXi Integration
+pyvmomi>=8.0.0.1.1
+
+# Web Framework (Backend API)
+flask>=3.0.0
+flask-cors>=4.0.0
+flask-compress>=1.14
+
+# Async WebSocket Proxy
+aiohttp>=3.9.0
+websockets>=12.0
+
+# Protocol Detection
+websocket-client>=1.7.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# Image Processing
+Pillow>=10.0.0
+
+# Configuration Management
+python-dotenv>=1.0.0
+
+# JWT Authentication (optional)
+pyjwt>=2.8.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+ipython>=8.12.0
+
+# Production WSGI/ASGI Servers
+gunicorn>=21.2.0
+uvicorn>=0.25.0

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  esxi-console-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: esxi-console-portal
+    restart: unless-stopped
+
+    # Port mapping
+    ports:
+      - "5001:5001"  # Flask API
+      - "8765:8765"  # WebSocket Proxy
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Mount configuration and data directories
+    volumes:
+      # Configuration files (read-only for security)
+      - ./config/servers.json:/app/config/servers.json:ro
+
+      # Persistent data directories
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+
+      # Optional: Mount frontend for development
+      # - ./frontend:/app/frontend
+
+    # Network configuration
+    networks:
+      - esxi-network
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/api/v1/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  esxi-network:
+    driver: bridge
